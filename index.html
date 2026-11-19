@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Voltrix Energy | Telemetría de Plantas</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+  <style>
+    body { margin: 0; background: #f6f8fb; }
+    .topbar { background: #142b42; color: white; padding: 22px 28px; font: 600 22px system-ui, sans-serif; }
+    .topbar small { display: block; font-size: 13px; font-weight: 400; opacity: .8; margin-top: 5px; }
+    .swagger-ui .topbar { display: none; }
+  </style>
+</head>
+<body>
+  <header class="topbar">Voltrix Energy <small>Documentación API · Telemetría de Plantas · Equipo 2</small></header>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    window.onload = () => SwaggerUIBundle({
+      url: './openapi.yaml',
+      dom_id: '#swagger-ui',
+      deepLinking: true,
+      presets: [SwaggerUIBundle.presets.apis],
+      layout: 'BaseLayout'
+    });
+  </script>
+</body>
+</html>
