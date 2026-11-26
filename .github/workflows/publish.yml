@@ -87,6 +87,7 @@ jobs:
               "if [ ! -f /opt/voltrix/.env ]; then install -m 600 /home/ubuntu/PROYECTO-FINAL-PARALELAS/.env /opt/voltrix/.env; fi",
           ]
           for source, target in [
+              ("docker-compose.yml", "/opt/voltrix/docker-compose.yml"),
               ("compose.ec2.yml", "/opt/voltrix/compose.ec2.yml"),
               ("scripts/deploy.sh", "/opt/voltrix/scripts/deploy.sh"),
           ]:
