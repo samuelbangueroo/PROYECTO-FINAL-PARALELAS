@@ -1,4 +1,6 @@
 """Validación preliminar mientras se desarrolla API de Inventario de Activos"""
+from app.core.tipos import TipoActivo
+
 class ClienteActivosFalso:
     _tipos = {
         ("PL-001", "PL-001-PS-07"): "panel_solar",

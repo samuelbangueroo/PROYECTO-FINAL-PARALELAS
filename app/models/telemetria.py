@@ -5,7 +5,7 @@ from datetime import datetime
 from uuid import UUID, uuid4
 from app.models.lectura import ESTADOS
 
-class Lectura(Base):
+class LecturaTelemetria(Base):
     __tablename__ = "lecturas"
     __table_args__ = (
         Index("ix_lecturas_planta_activo_fecha", "plantaId", "activoId", "fechaHora"),

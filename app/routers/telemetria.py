@@ -6,7 +6,9 @@ from fastapi import APIRouter, Depends, Header, Path as PathParam, Query, Reques
 from fastapi.responses import FileResponse
 from app.routers.errores import SolicitudInvalida
 
-from app.repositories.telemetria import FiltrosLecturas, RepositorioNoDisponible
+from app.repositories.telemetria import RepositorioNoDisponible   
+from app.services.telemetria import ConsultaLecturas, ServicioTelemetria
+
 from app.schemas.telemetria import (
     FechaRFC3339,
     Identificador,
@@ -71,8 +73,8 @@ def consultar_telemetria(
 ) -> list[LecturaTelemetria]:
     if desde is not None and hasta is not None and desde >= hasta:
         raise SolicitudInvalida("desde", "debe ser anterior a hasta")
-    filtros = FiltrosLecturas(plantaId, desde, hasta, activoId, tipoActivo, metrica)
-    lecturas, siguiente = servicio.consultar(filtros, offset=offset, limite=limit)
+    consulta = ConsultaLecturas(plantaId, desde, hasta, activoId, tipoActivo, metrica)
+    lecturas, siguiente = servicio.consultar(consulta, offset=offset, limite=limit)
     if siguiente is not None:
         response.headers["X-Next-Offset"] = str(siguiente)
     return lecturas
