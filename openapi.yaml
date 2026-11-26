@@ -1,12 +1,11 @@
 # =============================================================================
-# Contrato OpenAPI v2 — Equipo 2: Telemetría de Plantas
-# Revisión con acuerdos de integración del 19/11/2026.
-# Confirmar filtros con los equipos consumidores antes de publicar como definitivo.
+# Contrato OpenAPI v03 — Equipo 2: Telemetría de Plantas
+# Borrador para coordinación: consulta con filtros y paginación.
 # =============================================================================
 openapi: 3.0.3
 info:
   title: Voltrix Energy · Telemetría de Plantas         
-  version: 1.1.0
+  version: 1.2.0
   description: |
     Contrato HTTP del servicio **Telemetría de Plantas** (Equipo 2). Recibe y almacena
     lecturas de sensores simuladas y permite consultarlas por planta.
@@ -39,7 +38,7 @@ info:
     Toda respuesta de negocio incluye `X-Request-Id`; registrarlo en los logs.
     Fechas RFC 3339 con zona horaria. Errores usan el esquema común `Error`.
     `429` incluye `Retry-After`; `503` indica indisponibilidad local y `502` una falla
-    de Inventario. Los filtros de consulta adicionales se acordarán con los equipos 3, 4 y 5.
+    de Inventario. La consulta por planta admite filtros y devuelve una página por solicitud.
   contact:
     name: Equipo 2 · Telemetría de Plantas               
 servers:                                                  # COMÚN
@@ -69,25 +68,60 @@ paths:
       tags: [Telemetría]
       operationId: consultarTelemetriaPorPlanta
       summary: Consultar lecturas de una planta
-      description: Devuelve las lecturas registradas para una planta. Los filtros de activo, métrica y periodo se incorporarán cuando los acuerden los equipos consumidores.
+      description: |
+        Devuelve una página de lecturas individuales de la planta indicada.
+        Aplica en conjunto los filtros presentes antes de paginar. Cada límite de
+        fecha es opcional: `desde <= fechaHora < hasta` cuando van ambos.
+        Se comparan instantes con su zona horaria y, si se envían ambos límites,
+        `desde` debe ser anterior a `hasta`.
+
+        Ordena por `fechaHora` ascendente, con un identificador interno de la lectura
+        como desempate. Usa `offset` y `limit` sobre los resultados ya filtrados.
+        Si hay más resultados, devuelve `X-Next-Offset`. Para seguir, conserva
+        planta, filtros y `limit`, y usa ese valor como `offset`.
+        Cada solicitud consulta los datos disponibles en ese momento.
       parameters:
         - $ref: '#/components/parameters/PlantaId'
         - $ref: '#/components/parameters/EquipoConsumidor'
+        - $ref: '#/components/parameters/Desde'
+        - $ref: '#/components/parameters/Hasta'
+        - $ref: '#/components/parameters/ActivoIdFiltro'
+        - $ref: '#/components/parameters/TipoActivoFiltro'
+        - $ref: '#/components/parameters/MetricaFiltro'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
       responses:
         '200':
-          description: Lecturas encontradas.
+          description: Una página de lecturas. Devuelve una lista vacía si no hay coincidencias o el offset ya alcanzó el final.
           headers:
             X-Request-Id:
               $ref: '#/components/headers/X-Request-Id'
+            X-Next-Offset:
+              $ref: '#/components/headers/X-Next-Offset'
           content:
             application/json:
               schema:
                 type: array
+                maxItems: 200
                 items:
                   $ref: '#/components/schemas/LecturaTelemetria'
               examples:
                 ejemplo:
                   $ref: '#/components/examples/LecturaTelemetriaEjemplo'
+                potenciaTurbina:
+                  summary: Una página de lecturas de potencia de turbina
+                  value:
+                    - plantaId: PL-041
+                      activoId: PL-041-TB-03
+                      fechaHora: '2026-11-24T05:10:00Z'
+                      metrica: potencia
+                      valor: 850
+                      unidad: W
+                sinCoincidencias:
+                  summary: Ninguna lectura coincide con los filtros
+                  value: []
+        '400':
+          $ref: '#/components/responses/SolicitudInvalida'
         '429':
           $ref: '#/components/responses/Sobrecarga'
         '503':
@@ -215,11 +249,59 @@ components:
         type: string
         pattern: '^equipo-[1-7]$'
         example: equipo-2
+    Desde:
+      name: desde
+      in: query
+      required: false
+      description: Instante inicial incluido. Fecha y hora RFC 3339 con zona horaria.
+      schema:
+        type: string
+        format: date-time
+      example: '2026-11-24T05:00:00Z'
+    Hasta:
+      name: hasta
+      in: query
+      required: false
+      description: Instante final excluido. Fecha y hora RFC 3339 con zona horaria.
+      schema:
+        type: string
+        format: date-time
+      example: '2026-11-25T05:00:00Z'
+    ActivoIdFiltro:
+      name: activoId
+      in: query
+      required: false
+      description: Devuelve lecturas de este activo dentro de la planta consultada.
+      schema:
+        $ref: '#/components/schemas/Identificador'
+      example: PL-041-TB-03
+    TipoActivoFiltro:
+      name: tipoActivo
+      in: query
+      required: false
+      description: |
+        Filtra por el tipo del activo informado por Inventario. Por ejemplo,
+        `turbina` selecciona las lecturas de las turbinas de la planta.
+      schema:
+        type: string
+        enum: [panel_solar, turbina, banco_baterias]
+      example: turbina
+    MetricaFiltro:
+      name: metrica
+      in: query
+      required: false
+      description: |
+        Coincidencia exacta con el nombre de la métrica almacenada.
+        Por ejemplo, `potencia` o `velocidad_viento` si se registró con ese nombre.
+      schema:
+        type: string
+        minLength: 1
+      example: potencia
     Limit:
       name: limit
       in: query
       required: false
-      description: Tamaño de página.
+      description: Número máximo de lecturas que devuelve la página.
       schema:
         type: integer
         minimum: 1
@@ -229,7 +311,7 @@ components:
       name: offset
       in: query
       required: false
-      description: Número de elementos a omitir.
+      description: Número de coincidencias ordenadas que se omiten antes de formar la página.
       schema:
         type: integer
         minimum: 0
@@ -268,6 +350,13 @@ components:
       schema:
         type: string
         format: uuid
+    X-Next-Offset:
+      description: |
+        Offset para la siguiente página, igual al offset actual más las lecturas devueltas.
+        Solo se incluye si quedan más coincidencias.
+      schema:
+        type: integer
+        minimum: 1
     Retry-After:
       description: Segundos que el consumidor debe esperar antes de reintentar.
       schema:
