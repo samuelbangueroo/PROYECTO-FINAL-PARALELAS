@@ -63,6 +63,8 @@ class LecturaTelemetria(BaseModel):
     def validar_estado_opcional(self) -> Self:
         if "estadoReportado" in self.model_fields_set and self.estadoReportado is None:
             raise ValueError("estadoReportado debe ser un estado válido cuando se incluye")
+        if self.valor is None and self.estadoReportado != "fuera_de_servicio":
+            raise ValueError("valor solo puede faltar si estadoReportado es 'fuera_de_servicio'")
         return self
 
 
