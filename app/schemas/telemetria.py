@@ -1,6 +1,7 @@
 import re
 from datetime import datetime
 from typing import Annotated, Literal, Self
+from app.core.tipos import EstadoReportado, Modo, TipoActivo
 
 from pydantic import (
     AfterValidator,
@@ -15,9 +16,7 @@ from pydantic import (
 )
 
 Identificador = Annotated[str, StringConstraints(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")]
-Modo = Literal["secuencial", "paralelo"]
-TipoActivo = Literal["panel_solar", "turbina", "banco_baterias"]
-EstadoReportado = Literal["operativo", "en_mantenimiento", "fuera_de_servicio"]
+
 
 
 def validar_formato_fecha(valor: object) -> object:
