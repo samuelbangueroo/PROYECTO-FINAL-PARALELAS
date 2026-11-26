@@ -1,6 +1,7 @@
 import re
 from datetime import datetime
 from typing import Annotated, Literal, Self
+from app.core.tipos import EstadoReportado, Modo, TipoActivo
 
 from pydantic import (
     AfterValidator,
@@ -15,9 +16,7 @@ from pydantic import (
 )
 
 Identificador = Annotated[str, StringConstraints(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")]
-Modo = Literal["secuencial", "paralelo"]
-TipoActivo = Literal["panel_solar", "turbina", "banco_baterias"]
-EstadoReportado = Literal["operativo", "en_mantenimiento", "fuera_de_servicio"]
+
 
 
 def validar_formato_fecha(valor: object) -> object:
@@ -64,6 +63,8 @@ class LecturaTelemetria(BaseModel):
     def validar_estado_opcional(self) -> Self:
         if "estadoReportado" in self.model_fields_set and self.estadoReportado is None:
             raise ValueError("estadoReportado debe ser un estado válido cuando se incluye")
+        if self.valor is None and self.estadoReportado != "fuera_de_servicio":
+            raise ValueError("valor solo puede faltar si estadoReportado es 'fuera_de_servicio'")
         return self
 
 

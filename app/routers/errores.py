@@ -1,6 +1,8 @@
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+from app.repositories.telemetria import RepositorioNoDisponible
+
 
 class SolicitudInvalida(Exception):
     def __init__(self, campo: str, problema: str) -> None:
@@ -20,3 +22,11 @@ def respuesta_error(
     if detalles:
         contenido["detalles"] = detalles
     return JSONResponse(contenido, status_code=estado, headers=headers)
+
+async def manejar_repositorio_no_disponible(
+    request: Request, exc: RepositorioNoDisponible
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={...},  # same structure as your SolicitudInvalida handler / the error schema in openapi.yaml
+    )
