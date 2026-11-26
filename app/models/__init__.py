@@ -1,1 +1,1 @@
-from app.models.telemetria import Lectura
+from app.models.telemetria import LecturaTelemetria

@@ -7,8 +7,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.database import SessionLocal
-from app.models.lectura import LecturaTelemetria as LecturaModel
-from app.schemas import LecturaTelemetria
+from app.models.telemetria import LecturaTelemetria as LecturaModel
+from app.schemas.telemetria import LecturaTelemetria
 
 
 class RepositorioNoDisponible(Exception):

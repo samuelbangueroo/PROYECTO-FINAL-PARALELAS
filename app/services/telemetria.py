@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from time import perf_counter
 
-from app.clients.activos import ClienteActivos
+from app.clients.activos import ClienteActivosFalso
 from app.core.tipos import TipoActivo
 from app.repositories.telemetria import FiltrosLecturas, RepositorioTelemetria
 from app.schemas.telemetria import (
@@ -26,12 +26,25 @@ class ConsultaLecturas:
 
 
 class ServicioTelemetria:
-    def __init__(self, repositorio: RepositorioTelemetria, activos: ClienteActivos) -> None:
+    def __init__(self, repositorio: RepositorioTelemetria, activos: ClienteActivosFalso) -> None:
         self.repositorio = repositorio
         self.activos = activos
 
     def registrar(self, lote: LoteTelemetria) -> ResultadoLote:
-        ...  # sin cambios
+        inicio = perf_counter()
+        self.repositorio.guardar(lote.lecturas)
+        cantidad = len(lote.lecturas)
+        return ResultadoLote(
+            recibidas=cantidad,
+            procesadas=cantidad,
+            descartadas=0,
+            metricas=MetricasProcesamiento(
+                modo="secuencial",
+                workers=1,
+                elementos=cantidad,
+                duracionMs=int((perf_counter() - inicio) * 1000),
+            ),
+        )
 
     def consultar(
         self, consulta: ConsultaLecturas, *, offset: int, limite: int
