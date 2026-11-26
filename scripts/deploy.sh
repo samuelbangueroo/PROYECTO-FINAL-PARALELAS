@@ -13,7 +13,6 @@ export API_IMAGE
 
 compose() {
     sudo --preserve-env=API_IMAGE docker compose \
-        -f docker-compose.yml \
         -f compose.ec2.yml "$@"
 }
 
