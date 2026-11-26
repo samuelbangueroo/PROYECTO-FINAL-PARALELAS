@@ -9,8 +9,9 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.docs import get_swagger_ui_html
 
+from app.clients.activos import ClienteActivosFalso
 from app.repositories.telemetria import (
-    RepositorioEnMemoria,
+    RepositorioPostgres,
     RepositorioNoDisponible,
     RepositorioTelemetria,
 )
@@ -38,8 +39,11 @@ def crear_app(
         lifespan=lifespan,
     )
     if repositorio is None:
-        repositorio = RepositorioEnMemoria()
-    app.state.servicio = ServicioTelemetria(repositorio)
+        repositorio = RepositorioPostgres()
+    app.state.servicio = ServicioTelemetria(
+    repositorio=RepositorioPostgres(),
+    activos=ClienteActivosFalso(),
+)   
     admision = BoundedSemaphore(max_solicitudes)
     app.include_router(router)
 

@@ -1,9 +1,14 @@
 from dataclasses import dataclass
 from datetime import datetime
-from threading import Lock
 from typing import Protocol
 
-from app.schemas.telemetria import LecturaTelemetria, TipoActivo
+from sqlalchemy import insert, select
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session, sessionmaker
+
+from app.core.database import SessionLocal
+from app.models.telemetria import LecturaTelemetria as LecturaModel
+from app.schemas.telemetria import LecturaTelemetria
 
 
 class RepositorioNoDisponible(Exception):
@@ -15,8 +20,7 @@ class FiltrosLecturas:
     planta_id: str
     desde: datetime | None
     hasta: datetime | None
-    activo_id: str | None
-    tipo_activo: TipoActivo | None
+    activos_ids: list[str] | None  # ya resuelto por el servicio (activo_id y/o tipo_activo)
     metrica: str | None
 
 
@@ -36,59 +40,74 @@ class RepositorioTelemetria(Protocol):
         ...
 
 
-class RepositorioEnMemoria:
-    """Datos de ejemplo para ejecutar el esqueleto del Avance 1."""
+def _a_schema(fila: LecturaModel) -> LecturaTelemetria:
+    """Convierte una fila a schema.
 
-    def __init__(self) -> None:
-        self._lock = Lock()
-        self._tipos: dict[tuple[str, str], TipoActivo] = {
-            ("PL-001", "PL-001-PS-07"): "panel_solar",
-            ("PL-041", "PL-041-TB-03"): "turbina",
-        }
-        self._lecturas = [
-            LecturaTelemetria(
-                plantaId="PL-001",
-                activoId="PL-001-PS-07",
-                fechaHora="2026-11-18T15:30:00Z",
-                metrica="potencia",
-                valor=0,
-                unidad="W",
-                estadoReportado="fuera_de_servicio",
-            ),
-            LecturaTelemetria(
-                plantaId="PL-041",
-                activoId="PL-041-TB-03",
-                fechaHora="2026-11-24T05:10:00Z",
-                metrica="potencia",
-                valor=850,
-                unidad="W",
-            ),
-        ]
+    estadoReportado solo se pasa si existe: el validador del schema rechaza
+    un None explícito, y una columna NULL significa "no reportado".
+    """
+    datos = dict(
+        plantaId=fila.plantaId,
+        activoId=fila.activoId,
+        fechaHora=fila.fechaHora,
+        metrica=fila.metrica,
+        valor=fila.valor,
+        unidad=fila.unidad,
+    )
+    if fila.estadoReportado is not None:
+        datos["estadoReportado"] = fila.estadoReportado
+    return LecturaTelemetria(**datos)
+
+
+class RepositorioPostgres:
+    def __init__(self, session_factory: sessionmaker[Session] = SessionLocal) -> None:
+        self._session_factory = session_factory
 
     def guardar(self, lecturas: list[LecturaTelemetria]) -> None:
-        with self._lock:
-            self._lecturas.extend(lecturas)
+        if not lecturas:
+            return
+        try:
+            # begin() abre una transacción: o se guarda todo el lote o nada.
+            with self._session_factory.begin() as db:
+                db.execute(
+                    insert(LecturaModel),
+                    [lectura.model_dump() for lectura in lecturas],
+                )
+        except SQLAlchemyError as exc:
+            raise RepositorioNoDisponible("No se pudo guardar el lote") from exc
 
     def consultar(
         self, filtros: FiltrosLecturas, *, offset: int, limite: int
     ) -> list[LecturaTelemetria]:
-        with self._lock:
-            coincidencias = [
-                lectura
-                for lectura in self._lecturas
-                if lectura.plantaId == filtros.planta_id
-                and (filtros.desde is None or lectura.fechaHora >= filtros.desde)
-                and (filtros.hasta is None or lectura.fechaHora < filtros.hasta)
-                and (filtros.activo_id is None or lectura.activoId == filtros.activo_id)
-                and (filtros.metrica is None or lectura.metrica == filtros.metrica)
-                and (
-                    filtros.tipo_activo is None
-                    or self._tipos.get((lectura.plantaId, lectura.activoId)) == filtros.tipo_activo
-                )
-            ]
-        # El orden de inserción equivale al identificador interno de la demo.
-        coincidencias.sort(key=lambda lectura: lectura.fechaHora)
-        return coincidencias[offset : offset + limite]
+        if filtros.activos_ids is not None and not filtros.activos_ids:
+            return []  # el tipo pedido no tiene activos: nada que consultar
+
+        stmt = select(LecturaModel).where(LecturaModel.plantaId == filtros.planta_id)
+        if filtros.desde is not None:
+            stmt = stmt.where(LecturaModel.fechaHora >= filtros.desde)
+        if filtros.hasta is not None:
+            stmt = stmt.where(LecturaModel.fechaHora < filtros.hasta)
+        if filtros.metrica is not None:
+            stmt = stmt.where(LecturaModel.metrica == filtros.metrica)
+        if filtros.activos_ids is not None:
+            stmt = stmt.where(LecturaModel.activoId.in_(filtros.activos_ids))
+
+        stmt = (
+            stmt.order_by(LecturaModel.fechaHora, LecturaModel.id)
+            .offset(offset)
+            .limit(limite)
+        )
+
+        try:
+            with self._session_factory() as db:
+                return [_a_schema(fila) for fila in db.scalars(stmt)]
+        except SQLAlchemyError as exc:
+            raise RepositorioNoDisponible("No se pudo consultar") from exc
 
     def disponible(self) -> bool:
-        return True
+        try:
+            with self._session_factory() as db:
+                db.execute(select(1))
+            return True
+        except SQLAlchemyError:
+            return False
