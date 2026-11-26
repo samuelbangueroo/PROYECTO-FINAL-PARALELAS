@@ -1,0 +1,5 @@
+services:
+  api:
+    image: ${API_IMAGE:?Falta API_IMAGE}
+  migrate:
+    image: ${API_IMAGE:?Falta API_IMAGE}
