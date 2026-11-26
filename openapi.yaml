@@ -41,15 +41,9 @@ info:
     de Inventario. La consulta por planta admite filtros y devuelve una página por solicitud.
   contact:
     name: Equipo 2 · Telemetría de Plantas               
-servers:                                                  # COMÚN
-  - url: http://{host}:{puerto}
-    description: Despliegue del Componente B (EC2) o entorno local. La dirección vigente está en la hoja Coordinacion_Voltrix.
-    variables:
-      host:
-        default: localhost
-        description: IP pública o DNS de la instancia EC2.
-      puerto:
-        default: "8080"
+servers:
+  - url: /
+    description: API en el mismo servidor y puerto desde donde se abre la documentación.
 tags:
   - name: Telemetría
     description: Lecturas de sensores recibidas por planta y activo.
